@@ -1,0 +1,55 @@
+# Nom du workflow affiché dans GitHub Actions
+name: Build_and_Test_Angular  
+
+# Événements qui déclenchent l’exécution du workflow
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Permet de déclencher manuellement
+
+# Variables d’environnement globales, accessibles à tous les jobs
+env:
+  NODE_VERSION: 20
+  ANGULAR_CLI_VERSION: 17
+
+# Paramètres par défaut appliqués aux étapes
+defaults:
+  run:
+    shell: bash
+
+# Définition des jobs
+jobs:
+  build-and-test:
+    name: Build and Test Angular App
+    runs-on: ubuntu-latest  # Environnement d’exécution
+
+    steps:
+      # Étape 1 : Checkout du code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Étape 2 : Installer Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Étape 3 : Installer Angular CLI
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli@${{ env.ANGULAR_CLI_VERSION }}
+
+      # Étape 4 : Installer les dépendances
+      - name: Install dependencies
+        run: npm ci
+
+      # Étape 5 : Lancer les tests unitaires
+      - name: Run unit tests
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+      # Étape 6 : Build de l’application
+      - name: Build Angular app
+        run: ng build --prod

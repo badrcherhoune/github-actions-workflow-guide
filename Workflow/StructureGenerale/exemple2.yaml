@@ -1,0 +1,103 @@
+# Nom du workflow affiché dans GitHub Actions
+name: Full GitHub Actions Workflow
+
+# Déclencheurs du workflow
+on:
+  push:
+    branches: [ "main", "develop" ]  # Déclenche sur push vers ces branches
+  pull_request:
+    branches: [ "main" ]             # Déclenche sur PR vers main
+  workflow_dispatch:                  # Permet un déclenchement manuel
+  schedule:
+    - cron: '0 3 * * *'              # Exécution automatique à 03h UTC chaque jour
+
+# Variables globales pour tout le workflow
+env:
+  GLOBAL_VAR: "Hello World"
+
+# Paramètres par défaut pour toutes les commandes 'run'
+defaults:
+  run:
+    shell: bash                       # Shell par défaut pour les commandes
+    working-directory: backend        # Répertoire par défaut
+
+# Permissions du token GITHUB_TOKEN
+permissions:
+  contents: read
+  packages: write
+  issues: write
+
+# Définition des jobs
+jobs:
+  # Job de build
+  build:
+    runs-on: ubuntu-latest            # Runner Ubuntu
+    if: github.event_name == 'push'   # Exécuter seulement si événement push
+    env:
+      JOB_VAR: "BuildJob"             # Variable spécifique au job
+
+    # Stratégie de matrix : tester plusieurs versions de Java et OS
+    strategy:
+      matrix:
+        java: [17, 21]
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false                 # Ne pas arrêter les autres jobs en cas d'erreur
+
+    # Exécution du job dans un conteneur Docker
+    container:
+      image: maven:3.9-eclipse-temurin-17
+      env:
+        MAVEN_OPTS: -Xmx2g
+
+    # Services auxiliaires (ex: base de données)
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: root
+        ports:
+          - 5432:5432
+
+    # Liste des étapes
+    steps:
+      # Checkout du code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup Java
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java }}  # Utilise la version du matrix
+          distribution: temurin
+
+      # Étape de build avec ID pour réutiliser les outputs
+      - id: build_step
+        name: Build project
+        run: mvn clean package
+        env:
+          STEP_VAR: "step1"                  # Variable spécifique à l’étape
+        shell: bash
+        working-directory: backend
+        continue-on-error: false             # Arrêter le workflow si erreur
+
+      # Étape de tests
+      - name: Run tests
+        run: mvn test
+        continue-on-error: true              # Ignorer les erreurs de tests
+
+      # Afficher les variables d'environnement
+      - name: Print environment
+        run: echo "Global: $GLOBAL_VAR, Job: $JOB_VAR, Step: $STEP_VAR"
+
+  # Job de déploiement
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build                            # Dépend du job build
+    if: success()                           # S’exécute seulement si build réussi
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy placeholder
+        run: echo "Deploying application..."  # Étape fictive de déploiement
